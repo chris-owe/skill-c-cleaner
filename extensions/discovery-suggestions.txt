@@ -1,0 +1,5 @@
+{
+  "_description": "此文件由 scan-discover.ps1 自动生成。手动确认后可将有用条目合并到 user-custom.json",
+  "_generated": "2026-05-12T00:00:00",
+  "suggestions": []
+}
