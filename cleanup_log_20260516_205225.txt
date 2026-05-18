@@ -1,0 +1,33 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260516205225
+Username: DESKTOP-9EB2L9Q\decent
+RunAs User: DESKTOP-9EB2L9Q\decent
+Configuration Name: 
+Machine: DESKTOP-9EB2L9Q (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File c:\.trae\skills\c-drive-cleaner\cleaners\clean-apps.ps1 -RiskLevel cautious
+Process ID: 3644
+PSVersion: 5.1.26100.8457
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.8457
+BuildVersion: 10.0.26100.8457
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\.trae\skills\c-drive-cleaner\cleanup_log_20260516_205225.txt
+
+风险级别: cautious | 指定应用: 全部
+
+
+✅ [dev_tools] node-gyp — 59.05 MB
+   路径: C:\Users\decent\AppData\Local\node-gyp\Cache
+   ✅ 已清理整个目录
+
+✅ [dev_tools] pip — 305.77 MB
+   路径: C:\Users\decent\AppData\Local\pip\cache
+   ✅ 已清理整个目录
+
+✅ [dev_tools] Yarn — 1.82 GB
+   路径: C:\Users\decent\AppData\Local\Yarn\Cache

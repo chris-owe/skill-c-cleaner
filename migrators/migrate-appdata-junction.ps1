@@ -1,4 +1,4 @@
-# migrate-appdata-junction.ps1 - AppData 符号链接迁移
+﻿# migrate-appdata-junction.ps1 - AppData 符号链接迁移
 # 参考 AppData Junction Migrator 开源项目最佳实践
 # 工作流: robocopy -> 验证 -> 原目录改名 -> mklink /J -> 验证 -> 失败回滚
 # 警告: 这是高风险操作，务必确保目标应用没有正在运行!

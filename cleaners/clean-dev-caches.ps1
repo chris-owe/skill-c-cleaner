@@ -1,4 +1,4 @@
-# clean-dev-caches.ps1 - 开发缓存清理（逐一确认模式）
+﻿# clean-dev-caches.ps1 - 开发缓存清理（逐一确认模式）
 # 覆盖 npm, pip, cargo, gradle, yarn, pnpm, node-gyp, maven, conda, go
 # 每项列出大小后需用户显式确认
 

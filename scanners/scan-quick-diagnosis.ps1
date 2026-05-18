@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OutputFormat = "console"
 )
 

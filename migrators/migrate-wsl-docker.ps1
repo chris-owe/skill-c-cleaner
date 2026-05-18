@@ -1,4 +1,4 @@
-# migrate-wsl-docker.ps1 - WSL/Docker Desktop 数据迁移
+﻿# migrate-wsl-docker.ps1 - WSL/Docker Desktop 数据迁移
 # 安全迁移到非系统盘，保留完整功能
 
 param(

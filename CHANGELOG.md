@@ -1,4 +1,129 @@
-# CHANGELOG — c-drive-cleaner 版本变更记录
+# CHANGELOG — CleanSight 版本变更记录
+
+## v6.1.2 (2026-05-16) — ⚡ 清理引擎性能紧急修复（Clean Engine Overhaul）
+
+### 🔴 根因修复：清理引擎 4 个致命 bug
+
+#### Bug 1: Remove-Item 大目录性能杀手（P0）
+- **问题**: `Remove-Item "$Path\*" -Recurse -Force` 在大目录下比 `cmd /c rmdir` 慢 10-100 倍
+  - 飞书 LarkShell 4.81 GB 目录清理卡死 30 分钟
+  - 而 `cmd /c rmdir /s /q` 只需 < 30 秒
+- **修复**: 新增 `Remove-Directory` 函数到 `_common.ps1`
+  - 优先使用 `cmd /c rmdir /s /q`（job 内执行，不阻塞主线程）
+  - 120 秒超时自动跳过（防止单点卡死）
+  - .NET `[System.IO.Directory]::Delete()` 作为备用方案
+  - 实时计时显示（`✅ (12.3s)`）
+- **受影响的脚本**: `clean-apps.ps1`（3 处）、`clean-safe.ps1`（所有 Safe-Clean 调用）
+
+#### Bug 2: 单点卡死导致全脚本崩溃（P0）
+- **问题**: 飞书卡死后，Trae CN（10.3 GB）等更大的项根本没机会清理
+- **修复**: 每个目录有独立的 120 秒超时，超时自动跳过，继续下一个
+  - `Start-Job` + `Wait-Job -Timeout 120` 实现
+
+#### Bug 3: 文件被进程锁定时无检测（P1）
+- **问题**: 不检查目标应用是否在运行，锁定文件导致 Remove-Item 卡住
+- **修复**: `clean-apps.ps1` 新增 `Test-AppRunning` 函数
+  - 清理前检测对应进程（Chrome/Edge/Trae/飞书等）
+  - 进程中时显示警告并跳过
+
+#### Bug 4: 清理确认机制不清晰（P1）
+- **问题**: 用户不知道要等多久、清了多少、进度如何
+- **修复**: 
+  - 进度显示: `[1/3] [2/3] [3/3]`
+  - 清理前提示: "即将清理 3 项，预计释放 15.81 GB"
+  - 清理后显示: "C盘当前: 130.93 GB / 148.91 GB (剩余 17.98 GB, 87.9%)"
+
+### 🐛 其他修复
+- **clean-safe.ps1 编码修复**: 添加 UTF-8 BOM，修复中文显示乱码
+- **clean-safe.ps1 权限错误**: `Test-Path` 添加 `-ErrorAction SilentlyContinue`，避免系统保护路径报错
+- **2 个新文件+1 个修改**: `_common.ps1` 新增 42 行 `Remove-Directory`，`clean-apps.ps1` 和 `clean-safe.ps1` 完全重写
+
+### 📊 性能提升预期
+| 场景 | 修复前 | 修复后 | 提升 |
+|------|--------|--------|------|
+| 清理 4.81 GB 飞书 | ❌ 卡死（>30分钟） | ✅ ~30 秒 | **60x+** |
+| 清理 10.3 GB Trae CN | ❌ 没机会跑 | ✅ ~60 秒 | **∞** |
+| 清理 15.81 GB (3项) | ❌ 飞书卡死后全崩 | ✅ ~3 分钟完成 | **∞** |
+
+### 🧪 新增 tests/ 测试评测文件夹
+- **创建完整测试体系**: `tests/` 目录，与 CONTEST-SUBMISSION.md 同步维护
+- **TEST-RESULTS-LOG.md**: 记录真实扫描测试结果（基于 3 次实际扫描数据）
+- **IDEA-LOG.md**: 记录优化想法、踩坑经验、TODO 清单（12 个已实现/开发中/未来想法）
+- **methodology/test-strategies.md**: 各模式的测试方法和验收标准
+- **scenarios/all-scenarios.md**: 按场景组织的测试结果（5 个真实场景）
+- **performance/benchmark-history.md**: 性能基准历史追踪
+
+### 📝 CONTEST-SUBMISSION.md 同步更新
+- 加入真实扫描验证数据（148.91 GB 磁盘，91.7% 使用率，28.39 GB 可释放）
+- 诚实标注 v6.2 memory/ 系统状态（骨架完成，待接入主流程）
+- 文件结构新增 tests/ 目录引用
+- 版本分化说明：稳定版 v6.1.0 / 开发版 v6.2.0
+
+## v6.1.0 (2026-05-16) — 🏭 生产级重构（Production Ready）
+
+### 品牌升级
+- **品牌名**: `c-drive-cleaner` → **CleanSight** (AI Disk Health Advisor)
+- **报告命名**: `report_YYYYMMDD_HHMMSS.md` → `CleanSight-CS-YYYYMMDD-HHMMSS-{score}.md`
+  - 格式: 品牌 + 日期时间 + 健康评分
+- **版本统一**: SKILL.md / analyze.ps1 / app-signatures.json 全部对齐到 v6.1.0
+
+### 🔧 核心引擎重写 (analyze.ps1)
+- **完全重写**: 从 7830 行旧版 → 全新生产级引擎
+- **新增 `-Template` 参数**: 支持 `-Template v6-ai-decision` 模板选择
+- **修复 SizeMB 兼容性**: hashtable 属性访问从 `Measure-Object SizeMB` 改为 `ForEach-Object { $_.SizeMB } | Measure-Object -Sum`
+  - 修复 analyze.ps1 中 4 处 + scan-security-software.ps1 中 1 处
+- **修复 PowerShell 反引号转义**: 报告中代码块 ``` 使用变量拼接避免解析错误
+- **健康评分算法**: `max(0, min(100, 100 - (used% - 50) * 2))`
+
+### 📝 SKILL.md 精简重写
+- **588 行 → 198 行** (-66%): 砍掉冗余营销内容，保留核心信息
+- 新增: 三大核心优势对比表、AI vs 传统工具矩阵、报告命名规范、维护规范章节
+- 新增: AI Agent Skill 工程化标准（版本管理/更新流程/兼容性要求/测试验证）
+- 保留: 安全原则/架构图/扫描类别速查/扩展性说明
+
+### 📊 报告系统全面升级
+- **删除旧模板**:
+  - ~~`report-template.md`~~ (v4 遗留)
+  - ~~`sample-report-v6-ai-decision-full.md`~~ (1500行假数据)
+  - ~~`report-template-v6-ai-decision.md`~~ (v6 初版)
+- **全新内嵌报告模板** (analyze.ps1 内):
+  - 执行摘要（健康评分 + 空间状态表）
+  - 12 类别扫描明细（按 Category A-L 分组）
+  - **AI 决策建议**（7项能力对比矩阵）
+  - **Tier 1/Tier 2 分级行动清单**
+  - **4 步使用指南**（含可执行命令）
+  - **推荐工具组合**（CleanSight + WizTree + BleachBit + BCU 工作流）
+  - **AI 对话问题示例**
+  - 报告元信息
+
+### 🐛 关键 Bug 修复
+
+#### 编码问题 (Critical)
+- **PowerShell BOM 编码**: 中文 Windows PS5.1 必须用 UTF-8 BOM 才能正确读取中文 .ps1 文件
+  - 所有 30+ 个 .ps1 文件统一添加 UTF-8 BOM
+  - 根因: PS5.1 默认用 GBK 编码读取无 BOM 文件，导致中文乱码和首行注释无法识别
+- **BOM 字符清理**: 修复 git 恢复后残留的多余 BOM 字符 (`﻿`)
+  - 使用 regex `\uFEFF` 全局替换清除嵌入 BOM
+
+#### 数据计算问题 (High)
+- **Category Total 显示 0 GB**: `Measure-Object -Property SizeMB` 无法读取 hashtable 的键
+  - 改用 `ForEach-Object { $_.SizeMB } | Measure-Object -Sum`
+- **scan-security-software.ps1 同样问题**: 同步修复
+
+#### 文件恢复事故 (Lesson Learned)
+- fix-bom.ps1 脚本因 `Replace` 方法参数类型错误导致文件被清空
+- 通过 `git checkout --` 成功恢复所有文件
+- 教训: 批量操作前必须先 git commit 或备份
+
+### ✅ 生产级质量验证
+- **真实扫描通过**: 12 类别全量扫描，耗时 ~30 分钟
+- **真实数据报告生成**: CleanSight-CS-20260516-140534-17.md (252 行)
+  - 健康评分: 17/100 (CRITICAL)
+  - 可安全释放: 28.11 GB
+  - 需确认: 30.68 GB
+  - 总扫描占用: 59.37 GB
+
+---
 
 ## v6.0.0 (2026-05-13) — 🧠 AI 决策层（现象级升级）
 

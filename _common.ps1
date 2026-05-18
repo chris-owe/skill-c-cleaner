@@ -1,4 +1,4 @@
-﻿# _common.ps1 - c-drive-cleaner shared functions
+# _common.ps1 - c-drive-cleaner shared functions
 # Dot-source: . (Join-Path (Split-Path -Parent $PSCommandPath) "_common.ps1")
 # Or from scanners: . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) "_common.ps1")
 
@@ -165,6 +165,63 @@ function Get-DriveSpace {
     }
 }
 
+function Test-Admin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal $identity
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Remove-Directory {
+    <#
+    .SYNOPSIS
+    高性能递归删除目录。直接调用 cmd /c rmdir，比 PowerShell Remove-Item 快 10-100 倍。
+    大目录（10GB+）通常在 30-60 秒内完成。
+    .PARAMETER Path
+    要删除的目录路径
+    .PARAMETER ShowTimer
+    是否显示耗时
+    #>
+    param(
+        [string]$Path,
+        [switch]$ShowTimer
+    )
+    if (-not (Test-Path $Path -ErrorAction SilentlyContinue)) { return $true }
+    if ($ShowTimer) { Write-Host "  删除中..." -NoNewline -ForegroundColor DarkGray }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    # cmd /c rmdir 是 Windows 原生命令，大目录下比 PS Remove-Item 快 10-100 倍
+    & cmd /c "rmdir /s /q `"$Path`""
+    $sw.Stop()
+    $elapsed = $sw.Elapsed.TotalSeconds.ToString('0.0')
+    $stillExists = Test-Path $Path -ErrorAction SilentlyContinue
+    if ($stillExists) {
+        try {
+            [System.IO.Directory]::Delete($Path, $true)
+            $sw2 = [System.Diagnostics.Stopwatch]::StartNew()
+            $sw2.Start()
+            # 等待异步删除完成
+            $waitCount = 0
+            while ((Test-Path $Path -ErrorAction SilentlyContinue) -and $waitCount -lt 60) {
+                Start-Sleep -Milliseconds 500
+                $waitCount++
+            }
+            $sw2.Stop()
+            $stillExists = Test-Path $Path -ErrorAction SilentlyContinue
+            if ($ShowTimer) {
+                if (-not $stillExists) {
+                    Write-Host " 完成($($sw.Elapsed.TotalSeconds.ToString('0.0'))s)" -ForegroundColor Green
+                } else {
+                    Write-Host " 失败($($sw.Elapsed.TotalSeconds.ToString('0.0'))s)" -ForegroundColor Red
+                }
+            }
+        } catch {
+            if ($ShowTimer) { Write-Host " 失败($($sw.Elapsed.TotalSeconds.ToString('0.0'))s)" -ForegroundColor Red }
+        }
+        return (-not $stillExists)
+    }
+    if ($ShowTimer) { Write-Host " 完成($elapsed s)" -ForegroundColor Green }
+    return $true
+}
+
 function Invoke-SignatureScan {
     param(
         [string]$Category,
@@ -183,8 +240,22 @@ function Invoke-SignatureScan {
             elseif ($app.cleanable -eq $false) { $advice = "不可删除" }
             if ($app.sub_cleanable) { $advice += " (可清理: $($app.sub_cleanable))" }
             $migration = ""
-            if ($app.migratable -eq $true) { $migration = "可迁移" }
-            if ($app.migration_method) { $migration += " ($($app.migration_method))" }
+            if ($app.migratable -eq $true) {
+                $migration = "可迁移"
+                if ($app.migration_method) {
+                    $methodLabel = switch -wildcard ($app.migration_method) {
+                        'env_var*' { "设环境变量" }
+                        'symlink*' { "符号链接" }
+                        'config*'  { "改配置文件" }
+                        'yarn_config*' { "yarn config set" }
+                        'pnpm_config*' { "pnpm config set" }
+                        'wsl_export*' { "wsl export/import" }
+                        default { $app.migration_method }
+                    }
+                    $migration += " ($methodLabel)"
+                    if ($app.migration_key) { $migration += " | key: $($app.migration_key)" }
+                }
+            }
             Write-ScanResult -Category $CategoryLabel -Name $app.name `
                 -Size $result.Size -Risk $risk -Path $result.Path `
                 -Advice $advice -Migration $migration -Note $app.note -Source "DB"

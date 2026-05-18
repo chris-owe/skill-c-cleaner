@@ -1,4 +1,4 @@
-# clean-deep.ps1 - Layer 2 深度清理（需逐项确认）
+﻿# clean-deep.ps1 - Layer 2 深度清理（需逐项确认）
 # 包含: Windows更新缓存 + WinSxS + 还原点 + 休眠
 # 每项列出大小后需用户显式确认 (Y/N)
 # 不自动执行任何操作！

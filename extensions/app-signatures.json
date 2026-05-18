@@ -1,5 +1,5 @@
 {
-  "_schema": "c-drive-cleaner v5.0 app signature database",
+  "_schema": "CleanSight v6.1 app signature database",
   "_description": "已知应用程序的缓存/数据路径签名。每个条目定义扫描时检测什么、在哪、能否清理/迁移。欢迎社区贡献 PR 添加新软件！",
   "_usage": "扫描脚本自动读取此文件,检测电脑上存在哪些已知应用。用户可通过 user-custom.json 扩展自己的软件。",
 

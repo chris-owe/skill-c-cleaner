@@ -1,61 +1,63 @@
-﻿# analyze.ps1 - C盘深度分析一键入口
-# 用法: .\analyze.ps1 [-Categories "A,B,C"] [-OutputFormat console|markdown|json]
-# 示例: .\analyze.ps1                        # 全部扫描，控制台输出
-#        .\analyze.ps1 -OutputFormat markdown  # 全部扫描，生成Markdown报告
-#        .\analyze.ps1 -Categories "C,D"       # 只扫描开发缓存+浏览器
-
-param(
+﻿param(
     [string]$Categories = "all",
-    [string]$OutputFormat = "console"
+    [string]$OutputFormat = "console",
+    [string]$Template = "v6-ai-decision"
 )
 
 $SkillRoot = Split-Path -Parent $PSCommandPath
 if (-not $SkillRoot) { $SkillRoot = "C:\.trae\skills\c-drive-cleaner" }
 . (Join-Path $SkillRoot "_common.ps1")
 
+$VERSION = "6.1.0"
+$BRAND = "CleanSight"
 $Global:CDriveScanResults = [System.Collections.ArrayList]::new()
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  C盘深度清理器 v5.0 — 一键分析" -ForegroundColor Cyan
+Write-Host "  $BRAND v$VERSION - AI Disk Health Advisor" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 $space = Get-DriveSpace
+$healthScore = 50
 if ($space) {
     $barLen = 30
     $usedBlocks = [math]::Round($space.UsedPercent / 100 * $barLen)
     $freeBlocks = $barLen - $usedBlocks
-    $bar = "█" * $usedBlocks + "░" * $freeBlocks
-    Write-Host "  C盘空间 [$bar] $($space.UsedPercent)%" -ForegroundColor $(if ($space.UsedPercent -gt 90) { "Red" } elseif ($space.UsedPercent -gt 80) { "Yellow" } else { "Green" })
-    Write-Host "  已用: $($space.UsedGB) GB / 总计: $($space.TotalGB) GB / 剩余: $($space.FreeGB) GB" -ForegroundColor White
+    $bar = "#" * $usedBlocks + "-" * $freeBlocks
+    $barColor = if ($space.UsedPercent -gt 90) { "Red" } elseif ($space.UsedPercent -gt 80) { "Yellow" } else { "Green" }
+    Write-Host "  C: [$bar] $($space.UsedPercent)%" -ForegroundColor $barColor
+    Write-Host "  Used: $($space.UsedGB) GB / Total: $($space.TotalGB) GB / Free: $($space.FreeGB) GB" -ForegroundColor White
+    $healthScore = [math]::Max(0, [math]::Min(100, 100 - ($space.UsedPercent - 50) * 2))
+    $scoreColor = if ($healthScore -ge 80) { "Green" } elseif ($healthScore -ge 60) { "Yellow" } else { "Red" }
+    Write-Host "  Health Score: $healthScore/100" -ForegroundColor $scoreColor
     Write-Host ""
 }
 
 $allCats = @(
-    @{ Code = "A"; Script = "scan-system-hidden.ps1"; Label = "系统隐藏大文件" }
-    @{ Code = "B"; Script = "scan-temp-files.ps1"; Label = "临时文件与缓存" }
-    @{ Code = "C"; Script = "scan-dev-caches.ps1"; Label = "开发工具缓存" }
-    @{ Code = "D"; Script = "scan-browsers.ps1"; Label = "浏览器缓存" }
-    @{ Code = "E"; Script = "scan-app-data.ps1"; Label = "应用数据与日志" }
-    @{ Code = "F"; Script = "scan-large-files.ps1"; Label = "大文件TOP N" }
-    @{ Code = "G"; Script = "scan-special-sources.ps1"; Label = "特殊占用源" }
-    @{ Code = "H"; Script = "scan-security-software.ps1"; Label = "安全软件数据" }
-    @{ Code = "I"; Script = "scan-multi-version.ps1"; Label = "多版本软件" }
-    @{ Code = "J"; Script = "scan-duplicate-runtimes.ps1"; Label = "重复运行时" }
-    @{ Code = "K"; Script = "scan-ime-data.ps1"; Label = "输入法数据" }
-    @{ Code = "L"; Script = "scan-im-apps.ps1"; Label = "即时通讯数据" }
+    @{ Code = "A"; Script = "scan-system-hidden.ps1" }
+    @{ Code = "B"; Script = "scan-temp-files.ps1" }
+    @{ Code = "C"; Script = "scan-dev-caches.ps1" }
+    @{ Code = "D"; Script = "scan-browsers.ps1" }
+    @{ Code = "E"; Script = "scan-app-data.ps1" }
+    @{ Code = "F"; Script = "scan-large-files.ps1" }
+    @{ Code = "G"; Script = "scan-special-sources.ps1" }
+    @{ Code = "H"; Script = "scan-security-software.ps1" }
+    @{ Code = "I"; Script = "scan-multi-version.ps1" }
+    @{ Code = "J"; Script = "scan-duplicate-runtimes.ps1" }
+    @{ Code = "K"; Script = "scan-ime-data.ps1" }
+    @{ Code = "L"; Script = "scan-im-apps.ps1" }
 )
 
-$selectedCats = if ($Categories -eq "all") {
-    $allCats
-} else {
+$selectedCats = if ($Categories -eq "all") { $allCats } else {
     $codes = $Categories -split "," | ForEach-Object { $_.Trim().ToUpper() }
     $allCats | Where-Object { $_.Code -in $codes }
 }
 
 $totalCats = @($selectedCats).Count
 $catIdx = 0
+$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
 foreach ($cat in $selectedCats) {
     $catIdx++
     $scriptPath = Join-Path $SkillRoot "scanners\$($cat.Script)"
@@ -63,93 +65,113 @@ foreach ($cat in $selectedCats) {
         Write-Host "[$catIdx/$totalCats] " -NoNewline -ForegroundColor DarkGray
         . $scriptPath
     } else {
-        Write-Host "  ⚠️ 找不到扫描脚本: $($cat.Script)" -ForegroundColor Red
+        Write-Host "  WARN: scanner not found: $($cat.Script)" -ForegroundColor Red
     }
 }
 
+$stopwatch.Stop()
+$scanDuration = "$([math]::Round($stopwatch.Elapsed.TotalSeconds, 1))s"
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  扫描完成 — 汇总" -ForegroundColor Cyan
+Write-Host "  Scan Complete (took $scanDuration)" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 $results = $Global:CDriveScanResults
-$totalCleanable = 0
-$totalCautious = 0
-$totalForbidden = 0
-$totalAll = 0
-if ($results.Count -gt 0) {
-    $totalCleanable = [math]::Round(($results | Where-Object { $_.Risk -eq "safe" } | Measure-Object SizeMB -Sum).Sum, 2)
-    $totalCautious = [math]::Round(($results | Where-Object { $_.Risk -eq "cautious" } | Measure-Object SizeMB -Sum).Sum, 2)
-    $totalForbidden = [math]::Round(($results | Where-Object { $_.Risk -eq "forbidden" } | Measure-Object SizeMB -Sum).Sum, 2)
-    $totalAll = [math]::Round(($results | Measure-Object SizeMB -Sum).Sum, 2)
+$totalCleanable = 0; $totalCautious = 0; $totalForbidden = 0; $totalAll = 0
+if ($results -and $results.Count -gt 0) {
+    $safeItems = @($results | Where-Object { $_.Risk -eq "safe" })
+    $cautItems = @($results | Where-Object { $_.Risk -eq "cautious" })
+    $forbItems = @($results | Where-Object { $_.Risk -eq "forbidden" })
+    if ($safeItems.Count -gt 0) { $totalCleanable = [math]::Round(($safeItems | ForEach-Object { $_.SizeMB } | Measure-Object -Sum).Sum, 2) }
+    if ($cautItems.Count -gt 0) { $totalCautious = [math]::Round(($cautItems | ForEach-Object { $_.SizeMB } | Measure-Object -Sum).Sum, 2) }
+    if ($forbItems.Count -gt 0) { $totalForbidden = [math]::Round(($forbItems | ForEach-Object { $_.SizeMB } | Measure-Object -Sum).Sum, 2) }
+    $totalAll = [math]::Round(($results | ForEach-Object { $_.SizeMB } | Measure-Object -Sum).Sum, 2)
 }
 
-if ($results.Count -eq 0) {
-    Write-Host "  未发现可清理项目" -ForegroundColor Green
+if (-not $results -or $results.Count -eq 0) {
+    Write-Host "  No cleanable items found" -ForegroundColor Green
 } else {
-    Write-Host "  ✅ 可安全清理:   $totalCleanable MB ($([math]::Round($totalCleanable/1024,2)) GB)" -ForegroundColor Green
-    Write-Host "  ⚠️ 需确认后操作: $totalCautious MB ($([math]::Round($totalCautious/1024,2)) GB)" -ForegroundColor Yellow
-    Write-Host "  🔴 不可删除:     $totalForbidden MB ($([math]::Round($totalForbidden/1024,2)) GB)" -ForegroundColor Red
-    Write-Host "  📊 总扫描占用:   $totalAll MB ($([math]::Round($totalAll/1024,2)) GB)" -ForegroundColor White
+    $cleanGB = [math]::Round($totalCleanable / 1024, 2)
+    $cautGB = [math]::Round($totalCautious / 1024, 2)
+    $forbGB = [math]::Round($totalForbidden / 1024, 2)
+    $allGB = [math]::Round($totalAll / 1024, 2)
+    Write-Host "  Safe to clean:     $cleanGB GB" -ForegroundColor Green
+    Write-Host "  Needs confirm:     $cautGB GB" -ForegroundColor Yellow
+    Write-Host "  Do NOT delete:     $forbGB GB" -ForegroundColor Red
+    Write-Host "  Total scanned:     $allGB GB" -ForegroundColor White
     Write-Host ""
-
-    $byCategory = $results | Group-Object Category | Sort-Object { ($_.Group | Measure-Object SizeMB -Sum).Sum } -Descending
-    Write-Host "  按类别统计:" -ForegroundColor White
+    $byCategory = $results | Group-Object Category | Sort-Object { ($_.Group | ForEach-Object { $_.SizeMB } | Measure-Object -Sum).Sum } -Descending
+    Write-Host "  By category:" -ForegroundColor White
     foreach ($grp in $byCategory) {
-        $catSize = [math]::Round(($grp.Group | Measure-Object SizeMB -Sum).Sum, 2)
-        $catLabel = switch ($grp.Name) {
-            "A" { "系统隐藏" } "B" { "临时文件" } "C" { "开发缓存" } "D" { "浏览器" }
-            "E" { "应用数据" } "F" { "大文件" } "G" { "特殊源" } "H" { "安全软件" }
-            "I" { "多版本" } "J" { "重复运行时" } "K" { "输入法" } "L" { "即时通讯" }
-            default { $grp.Name }
-        }
-        Write-Host "    $($grp.Name)类($catLabel): $catSize MB" -ForegroundColor DarkGray
+        $catSize = [math]::Round(($grp.Group | ForEach-Object { $_.SizeMB } | Measure-Object -Sum).Sum, 2)
+        $catGB = [math]::Round($catSize / 1024, 2)
+        Write-Host "    $($grp.Name): $catGB GB" -ForegroundColor DarkGray
     }
 }
 
-if ($OutputFormat -eq "markdown") {
-    $mdPath = Join-Path $SkillRoot "report_$(Get-Date -Format 'yyyyMMdd_HHmmss').md"
-    $sb = [System.Text.StringBuilder]::new()
-    [void]$sb.AppendLine("# C盘深度清理报告")
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("**生成时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
-    if ($space) {
-        [void]$sb.AppendLine("")
-        [void]$sb.AppendLine("## C盘空间概览")
-        [void]$sb.AppendLine("")
-        [void]$sb.AppendLine("| 项目 | 大小 |")
-        [void]$sb.AppendLine("|------|------|")
-        [void]$sb.AppendLine("| 总计 | $($space.TotalGB) GB |")
-        [void]$sb.AppendLine("| 已用 | $($space.UsedGB) GB ($($space.UsedPercent)%) |")
-        [void]$sb.AppendLine("| 剩余 | $($space.FreeGB) GB |")
-    }
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("## 扫描结果")
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("| 类别 | 名称 | 大小 | 风险 | 建议 | 来源 |")
-    [void]$sb.AppendLine("|------|------|------|------|------|------|")
-    foreach ($r in $results) {
-        $riskIcon = switch ($r.Risk) { "safe" { "✅" } "cautious" { "⚠️" } "dangerous" { "❌" } "forbidden" { "🔴" } default { "⚠️" } }
-        $sizeStr = if ($r.SizeMB -ge 1024) { "$([math]::Round($r.SizeMB/1024,2)) GB" } else { "$($r.SizeMB) MB" }
-        [void]$sb.AppendLine("| $($r.Category) | $($r.Name) | $sizeStr | $riskIcon | $($r.Advice) | $($r.Source) |")
-    }
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("## 汇总")
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("- ✅ 可安全清理: $([math]::Round($totalCleanable,2)) MB")
-    [void]$sb.AppendLine("- ⚠️ 需确认后操作: $([math]::Round($totalCautious,2)) MB")
-    [void]$sb.AppendLine("- 🔴 不可删除: $([math]::Round($totalForbidden,2)) MB")
-    $sb.ToString() | Out-File $mdPath -Encoding UTF8
-    Write-Host ""
-    Write-Host "  📝 Markdown报告已生成: $mdPath" -ForegroundColor Green
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$reportId = "CS-${timestamp}-$($healthScore)"
+$cb = [char]96 + [char]96 + [char]96
+
+$catNamesCN = @{
+    "A"="系统隐藏"; "B"="临时缓存"; "C"="开发缓存"; "D"="浏览器";
+    "E"="应用数据"; "F"="大文件"; "G"="特殊占用"; "H"="安全软件";
+    "I"="多版本"; "J"="重复运行时"; "K"="输入法"; "L"="即时通讯"
 }
+
+$knownBloat = @{
+    "腾讯电脑管家" = "通常是捆绑安装的。如不主动用它杀毒/加速，建议控制面板卸载"
+    "360安全卫士"   = "免费杀毒软件但常弹广告。Windows Defender 已足够，建议卸载"
+    "360全家桶"     = "浏览器+压缩+安全全家桶，通常是捆绑安装，建议整套卸载"
+    "2345全家桶"    = "著名流氓软件家族，通常静默安装，建议用 Geek Uninstaller 深度清理"
+    "快压"          = "弹窗广告多，建议用 7-Zip 替代并卸载"
+    "好压"          = "广告多，建议用 7-Zip 替代"
+    "鲁大师"        = "温度监控但广告多，可用 HWMonitor 替代"
+    "小鸟壁纸"      = "弹窗广告+静默安装，必须卸载"
+    "Flash中国版"   = "含广告服务，现代浏览器已不需要 Flash，必须卸载"
+    "驱动精灵"      = "驱动更新工具，Windows Update 已能自动更新"
+    "驱动人生"      = "同驱动精灵，建议卸载"
+    "搜狗高速浏览器" = "老旧浏览器内核，建议用 Edge/Chrome 替代"
+    "PPS"           = "老旧 P2P 播放器后台占带宽，建议卸载"
+    "PPTV"          = "同 PPS，建议卸载"
+    "WeGame"        = "腾讯游戏平台，如果不玩游戏可卸载"
+}
+
+function BuildReport {
+    $reportsDir = Join-Path $SkillRoot "reports"
+    if (-not (Test-Path $reportsDir)) { New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null }
+    $mdPath = Join-Path $reportsDir "CleanSight-${reportId}.md"
+    $lines = @()
+    $lines += "# CleanSight AI 磁盘健康报告"
+    $lines += ""
+    $lines += "> **报告编号**: $reportId | **生成时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | **引擎**: $BRAND v$VERSION"
+    $lines += "> **本报告为只读分析，未修改任何文件。所有操作需用户确认后执行。**"
+    $lines += "---"
+    $lines += "# 一、执行摘要"
+    if ($space) {
+        $usageLevelCN = if ($space.UsedPercent -gt 90) { "🔴 危急" } elseif ($space.UsedPercent -gt 80) { "⚠️ 偏高" } else { "✅ 正常" }
+        $freeLevelCN = if ($space.FreeGB -lt 15) { "🔴 不足" } elseif ($space.FreeGB -lt 30) { "⚠️ 偏低" } else { "✅ 充足" }
+        $lines += "| 总容量 | $($space.TotalGB) GB | - |"
+        $lines += "| 已用空间 | $($space.UsedGB) GB ($($space.UsedPercent)%) | $usageLevelCN |"
+        $lines += "| 可用空间 | $($space.FreeGB) GB | $freeLevelCN |"
+        $lines += "| 可安全释放 | $([math]::Round($totalCleanable/1024,2)) GB |"
+        $lines += "| 需确认后释放 | $([math]::Round($totalCautious/1024,2)) GB |"
+    }
+    $lines | Out-File $mdPath -Encoding UTF8
+    Write-Host "  Report generated: $mdPath" -ForegroundColor Green
+}
+
+if ($OutputFormat -eq "markdown") { BuildReport }
 
 if ($OutputFormat -eq "json") {
-    $jsonPath = Join-Path $SkillRoot "report_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
-    $results | ConvertTo-Json -Depth 5 | Out-File $jsonPath -Encoding UTF8
-    Write-Host ""
-    Write-Host "  📝 JSON报告已生成: $jsonPath" -ForegroundColor Green
+    $reportsDir = Join-Path $SkillRoot "reports"
+    if (-not (Test-Path $reportsDir)) { New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null }
+    $jsonPath = Join-Path $reportsDir "CleanSight-${reportId}.json"
+    $output = @{ report_id = $reportId; version = $VERSION; timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"; scan_duration = $scanDuration }
+    $output | ConvertTo-Json -Depth 5 | Out-File $jsonPath -Encoding UTF8
+    Write-Host "  JSON report generated: $jsonPath" -ForegroundColor Green
 }
 
 Write-Host ""

@@ -1,4 +1,4 @@
-# snapshot-before-after.ps1 - 清理/迁移前后快照对比
+﻿# snapshot-before-after.ps1 - 清理/迁移前后快照对比
 # 记录操作前后的C盘空间和各主要目录大小
 
 param(
