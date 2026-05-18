@@ -174,52 +174,68 @@ function Test-Admin {
 function Remove-Directory {
     <#
     .SYNOPSIS
-    高性能递归删除目录。直接调用 cmd /c rmdir，比 PowerShell Remove-Item 快 10-100 倍。
-    大目录（10GB+）通常在 30-60 秒内完成。
+    高性能递归删除目录，带超时控制和多级回退。
+    主方案: cmd /c rmdir（快 10-100 倍）+ 超时保护
+    回退A: robocopy /MIR 快速清空后再 rmdir（比 .NET Delete 快数倍）
+    回退B: .NET API 作为最后手段
     .PARAMETER Path
     要删除的目录路径
     .PARAMETER ShowTimer
     是否显示耗时
+    .PARAMETER TimeoutSec
+    超时秒数（默认 120，大目录 30-60 秒通常足够）
     #>
     param(
         [string]$Path,
-        [switch]$ShowTimer
+        [switch]$ShowTimer,
+        [int]$TimeoutSec = 120
     )
     if (-not (Test-Path $Path -ErrorAction SilentlyContinue)) { return $true }
     if ($ShowTimer) { Write-Host "  删除中..." -NoNewline -ForegroundColor DarkGray }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    # cmd /c rmdir 是 Windows 原生命令，大目录下比 PS Remove-Item 快 10-100 倍
-    & cmd /c "rmdir /s /q `"$Path`""
-    $sw.Stop()
-    $elapsed = $sw.Elapsed.TotalSeconds.ToString('0.0')
+
+    # 方案 A: cmd /c rmdir 带超时保护
+    $processExited = $true
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = "cmd"
+        $psi.Arguments = "/c rmdir /s /q `"$Path`""
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $processExited = $p.WaitForExit($TimeoutSec * 1000)
+        if (-not $processExited) {
+            $p.Kill()
+            if ($ShowTimer) { Write-Host " 超时..." -NoNewline -ForegroundColor Yellow }
+        }
+    } catch {
+        $processExited = $false
+    }
+
     $stillExists = Test-Path $Path -ErrorAction SilentlyContinue
     if ($stillExists) {
+        # 方案 B: robocopy /MIR 快速清空（比 .NET Delete 快数倍）
         try {
-            [System.IO.Directory]::Delete($Path, $true)
-            $sw2 = [System.Diagnostics.Stopwatch]::StartNew()
-            $sw2.Start()
-            # 等待异步删除完成
-            $waitCount = 0
-            while ((Test-Path $Path -ErrorAction SilentlyContinue) -and $waitCount -lt 60) {
-                Start-Sleep -Milliseconds 500
-                $waitCount++
-            }
-            $sw2.Stop()
-            $stillExists = Test-Path $Path -ErrorAction SilentlyContinue
-            if ($ShowTimer) {
-                if (-not $stillExists) {
-                    Write-Host " 完成($($sw.Elapsed.TotalSeconds.ToString('0.0'))s)" -ForegroundColor Green
-                } else {
-                    Write-Host " 失败($($sw.Elapsed.TotalSeconds.ToString('0.0'))s)" -ForegroundColor Red
-                }
-            }
+            if ($ShowTimer) { Write-Host " 回退(robocopy)..." -NoNewline -ForegroundColor Yellow }
+            $emptyDir = Join-Path $env:TEMP "_empty_$(Get-Random)"
+            $null = New-Item -ItemType Directory -Path $emptyDir -Force
+            & robocopy $emptyDir $Path /MIR /R:1 /W:1 > $null 2>&1
+            Remove-Item $emptyDir -Force -ErrorAction SilentlyContinue
+            & cmd /c "rmdir /s /q `"$Path`"" 2>$null
         } catch {
-            if ($ShowTimer) { Write-Host " 失败($($sw.Elapsed.TotalSeconds.ToString('0.0'))s)" -ForegroundColor Red }
+            # 方案 C: .NET API 作为最后手段
+            try { [System.IO.Directory]::Delete($Path, $true) } catch {}
         }
-        return (-not $stillExists)
     }
-    if ($ShowTimer) { Write-Host " 完成($elapsed s)" -ForegroundColor Green }
-    return $true
+
+    $sw.Stop()
+    $stillExists = Test-Path $Path -ErrorAction SilentlyContinue
+    if ($ShowTimer) {
+        $elapsed = $sw.Elapsed.TotalSeconds.ToString('0.0')
+        $msg = if (-not $stillExists) { " 完成($($elapsed)s)" } else { " 失败($($elapsed)s)" }
+        Write-Host $msg -ForegroundColor $(if (-not $stillExists) { "Green" } else { "Red" })
+    }
+    return (-not $stillExists)
 }
 
 function Invoke-SignatureScan {

@@ -1,6 +1,12 @@
-﻿# clean-dev-caches.ps1 - 开发缓存清理（逐一确认模式）
+# clean-dev-caches.ps1 - 开发缓存清理（逐一确认模式）
 # 覆盖 npm, pip, cargo, gradle, yarn, pnpm, node-gyp, maven, conda, go
 # 每项列出大小后需用户显式确认
+
+$skillRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+if (-not $skillRoot -or -not (Test-Path (Join-Path $skillRoot "_common.ps1"))) {
+    $skillRoot = "C:\.trae\skills\c-drive-cleaner"
+}
+. (Join-Path $skillRoot "_common.ps1")
 
 $UserProfile = $env:USERPROFILE
 $LocalAppData = $env:LOCALAPPDATA
@@ -17,9 +23,12 @@ function Clean-Cache {
         Write-Host "[$Name] 未使用 — 跳过" -ForegroundColor DarkGray
         return
     }
-    $items = Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue
-    $size = ($items | Where-Object { -not $_.PSIsContainer } | Measure-Object Length -Sum).Sum
-    $sizeMB = [math]::Round($size / 1MB, 2)
+    $r = Get-FolderSizeFast $Path
+    if (-not $r.Found -or $r.Size -eq 0) {
+        Write-Host "[$Name] 空目录, 跳过" -ForegroundColor DarkGray
+        return
+    }
+    $sizeMB = [math]::Round($r.Size / 1MB, 2)
     if ($sizeMB -lt 1) {
         Write-Host "[$Name] ${sizeMB} MB — 太小，跳过" -ForegroundColor DarkGray
         return
@@ -32,9 +41,10 @@ function Clean-Cache {
     $confirm = Read-Host "  是否清理? (Y/N)"
     if ($confirm -eq 'Y') {
         try {
-            Remove-Item "$Path\*" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Directory -Path $Path -ShowTimer
+            $null = New-Item -ItemType Directory -Path $Path -Force -ErrorAction SilentlyContinue
             Write-Host "  ✅ 已清理 ${sizeMB} MB" -ForegroundColor Green
-            $script:totalFreed += [long]$size
+            $script:totalFreed += [long]$r.Size
         } catch {
             Write-Host "  ❌ 无法删除文件(可能正在使用): 尝试用命令行 $CmdHint" -ForegroundColor Red
         }
@@ -58,21 +68,29 @@ Write-Host "[⚠️ 高风险缓存 — 请确认后操作]" -ForegroundColor Ye
 
 $nugetPath = "$UserProfile\.nuget\packages"
 if (Test-Path $nugetPath) {
-    $nsizeMB = [math]::Round((Get-ChildItem $nugetPath -Recurse -Force -EA SilentlyContinue | Where-Object {-not $_.PSIsContainer} | Measure-Object Length -Sum).Sum / 1MB, 2)
-    Write-Host "[NuGet缓存] ${nsizeMB} MB — 删除后VS打开方案重新下载" -ForegroundColor Yellow
-    if ((Read-Host "  确认删除? 输入 YES 才执行") -eq 'YES') {
-        Remove-Item "$nugetPath\*" -Recurse -Force -EA SilentlyContinue
-        Write-Host "  ✅ 已清理" -ForegroundColor Green
+    $nr = Get-FolderSizeFast $nugetPath
+    if ($nr.Found -and $nr.Size -gt 0) {
+        $nsizeMB = [math]::Round($nr.Size / 1MB, 2)
+        Write-Host "[NuGet缓存] ${nsizeMB} MB — 删除后VS打开方案重新下载" -ForegroundColor Yellow
+        if ((Read-Host "  确认删除? 输入 YES 才执行") -eq 'YES') {
+            Remove-Directory -Path $nugetPath -ShowTimer
+            $null = New-Item -ItemType Directory -Path $nugetPath -Force -ErrorAction SilentlyContinue
+            Write-Host "  ✅ 已清理" -ForegroundColor Green
+        }
     }
 }
 
 $mavenPath = "$UserProfile\.m2\repository"
 if (Test-Path $mavenPath) {
-    $msizeMB = [math]::Round((Get-ChildItem $mavenPath -Recurse -Force -EA SilentlyContinue | Where-Object {-not $_.PSIsContainer} | Measure-Object Length -Sum).Sum / 1MB, 2)
-    Write-Host "[Maven仓库] ${msizeMB} MB — 删除后构建重新下载" -ForegroundColor Yellow
-    if ((Read-Host "  确认删除? 输入 YES 才执行") -eq 'YES') {
-        Remove-Item "$mavenPath\*" -Recurse -Force -EA SilentlyContinue
-        Write-Host "  ✅ 已清理" -ForegroundColor Green
+    $mr = Get-FolderSizeFast $mavenPath
+    if ($mr.Found -and $mr.Size -gt 0) {
+        $msizeMB = [math]::Round($mr.Size / 1MB, 2)
+        Write-Host "[Maven仓库] ${msizeMB} MB — 删除后构建重新下载" -ForegroundColor Yellow
+        if ((Read-Host "  确认删除? 输入 YES 才执行") -eq 'YES') {
+            Remove-Directory -Path $mavenPath -ShowTimer
+            $null = New-Item -ItemType Directory -Path $mavenPath -Force -ErrorAction SilentlyContinue
+            Write-Host "  ✅ 已清理" -ForegroundColor Green
+        }
     }
 }
 
