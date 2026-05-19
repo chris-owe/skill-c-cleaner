@@ -171,11 +171,21 @@ function Test-Admin {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Get-ProgressBar {
+    param([int]$Current, [int]$Total, [int]$Width = 30)
+    if ($Total -le 0) { return "" }
+    $pct = [math]::Min(100, [math]::Max(0, [int]($Current / $Total * 100)))
+    $filled = [math]::Max(0, [math]::Min($Width, [int]($pct * $Width / 100)))
+    $empty = $Width - $filled
+    $bar = "[" + ("=" * $filled) + (">" * [math]::Min(1, $filled - [math]::Max(0, $filled - 1))) + (" " * $empty) + "]"
+    return "$bar $pct%"
+}
+
 function Remove-Directory {
     <#
     .SYNOPSIS
-    高性能递归删除目录，带超时控制和多级回退。
-    主方案: cmd /c rmdir（快 10-100 倍）+ 超时保护
+    高性能递归删除目录，带进度反馈、超时控制和多级回退。
+    主方案: cmd /c rmdir（快 10-100 倍）+ 每 5 秒进度反馈
     回退A: robocopy /MIR 快速清空后再 rmdir（比 .NET Delete 快数倍）
     回退B: .NET API 作为最后手段
     .PARAMETER Path
@@ -184,17 +194,35 @@ function Remove-Directory {
     是否显示耗时
     .PARAMETER TimeoutSec
     超时秒数（默认 120，大目录 30-60 秒通常足够）
+    .PARAMETER ShowProgress
+    删除过程中是否定期输出进度（耗时+剩余大小检查）
     #>
     param(
         [string]$Path,
         [switch]$ShowTimer,
-        [int]$TimeoutSec = 120
+        [int]$TimeoutSec = 120,
+        [switch]$ShowProgress
     )
     if (-not (Test-Path $Path -ErrorAction SilentlyContinue)) { return $true }
-    if ($ShowTimer) { Write-Host "  删除中..." -NoNewline -ForegroundColor DarkGray }
+
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
-    # 方案 A: cmd /c rmdir 带超时保护
+    # 预先计算大小（用于进度估计）
+    $initialSize = 0L
+    $initialSizeStr = ""
+    if ($ShowProgress) {
+        $r = Get-FolderSizeFast $Path
+        if ($r.Found) {
+            $initialSize = $r.Size
+            $sizeMB = [math]::Round($initialSize / 1MB, 2)
+            $initialSizeStr = if ($sizeMB -ge 1024) { "$([math]::Round($sizeMB/1024,2)) GB" } else { "$sizeMB MB" }
+        }
+        Write-Host "  删除中 ($initialSizeStr)..." -ForegroundColor DarkGray
+    } elseif ($ShowTimer) {
+        Write-Host "  删除中..." -NoNewline -ForegroundColor DarkGray
+    }
+
+    # 方案 A: cmd /c rmdir 带超时保护和进度反馈
     $processExited = $true
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -203,10 +231,42 @@ function Remove-Directory {
         $psi.UseShellExecute = $false
         $psi.CreateNoWindow = $true
         $p = [System.Diagnostics.Process]::Start($psi)
-        $processExited = $p.WaitForExit($TimeoutSec * 1000)
+
+        if ($ShowProgress) {
+            $progressInterval = 5
+            $prevRemainingStr = ""
+            $cursorLeft = [Console]::CursorLeft
+            while (-not $p.WaitForExit($progressInterval * 1000)) {
+                $elapsed = $sw.Elapsed.TotalSeconds.ToString('0.0')
+                $remainingSize = 0L
+                $remainingStr = ""
+                if (Test-Path $Path -ErrorAction SilentlyContinue) {
+                    $rr = Get-FolderSizeFast $Path
+                    if ($rr.Found) { $remainingSize = $rr.Size }
+                }
+                if ($remainingSize -gt 0 -and $initialSize -gt 0) {
+                    $cleaned = $initialSize - $remainingSize
+                    $cleanedMB = [math]::Round($cleaned / 1MB, 2)
+                    $totalMB = [math]::Round($initialSize / 1MB, 2)
+                    $pctDone = [math]::Min(99, [int]($cleaned / $initialSize * 100))
+                    $remainingStr = " 已删 ${cleanedMB}MB/${totalMB}MB"
+                    $bar = Get-ProgressBar -Current $cleaned -Total $initialSize -Width 20
+                    # 用 \r 回到行首覆盖输出
+                    Write-Host "`r  [${elapsed}s]$bar$remainingStr  " -NoNewline -ForegroundColor DarkGray
+                } else {
+                    Write-Host "`r  [${elapsed}s] 删除中...  " -NoNewline -ForegroundColor DarkGray
+                }
+            }
+            $elapsed = $sw.Elapsed.TotalSeconds.ToString('0.0')
+            Write-Host "`r  [${elapsed}s] 等待完成...     " -NoNewline -ForegroundColor DarkGray
+            $processExited = $true
+        } else {
+            $processExited = $p.WaitForExit($TimeoutSec * 1000)
+        }
+
         if (-not $processExited) {
             $p.Kill()
-            if ($ShowTimer) { Write-Host " 超时..." -NoNewline -ForegroundColor Yellow }
+            if ($ShowTimer -or $ShowProgress) { Write-Host " 超时..." -NoNewline -ForegroundColor Yellow }
         }
     } catch {
         $processExited = $false
@@ -214,26 +274,32 @@ function Remove-Directory {
 
     $stillExists = Test-Path $Path -ErrorAction SilentlyContinue
     if ($stillExists) {
-        # 方案 B: robocopy /MIR 快速清空（比 .NET Delete 快数倍）
+        if ($ShowProgress -or $ShowTimer) {
+            Write-Host " 回退(robocopy)..." -NoNewline -ForegroundColor Yellow
+        }
         try {
-            if ($ShowTimer) { Write-Host " 回退(robocopy)..." -NoNewline -ForegroundColor Yellow }
             $emptyDir = Join-Path $env:TEMP "_empty_$(Get-Random)"
             $null = New-Item -ItemType Directory -Path $emptyDir -Force
             & robocopy $emptyDir $Path /MIR /R:1 /W:1 > $null 2>&1
             Remove-Item $emptyDir -Force -ErrorAction SilentlyContinue
             & cmd /c "rmdir /s /q `"$Path`"" 2>$null
         } catch {
-            # 方案 C: .NET API 作为最后手段
             try { [System.IO.Directory]::Delete($Path, $true) } catch {}
         }
     }
 
     $sw.Stop()
     $stillExists = Test-Path $Path -ErrorAction SilentlyContinue
-    if ($ShowTimer) {
+    if ($ShowTimer -or $ShowProgress) {
         $elapsed = $sw.Elapsed.TotalSeconds.ToString('0.0')
-        $msg = if (-not $stillExists) { " 完成($($elapsed)s)" } else { " 失败($($elapsed)s)" }
-        Write-Host $msg -ForegroundColor $(if (-not $stillExists) { "Green" } else { "Red" })
+        if ($ShowProgress) {
+            $icon = if (-not $stillExists) { "✅" } else { "❌" }
+            Write-Host ""
+            Write-Host "    $icon 耗时 ${elapsed}s" -ForegroundColor $(if (-not $stillExists) { "Green" } else { "Red" })
+        } else {
+            $msg = if (-not $stillExists) { " 完成($($elapsed)s)" } else { " 失败($($elapsed)s)" }
+            Write-Host $msg -ForegroundColor $(if (-not $stillExists) { "Green" } else { "Red" })
+        }
     }
     return (-not $stillExists)
 }

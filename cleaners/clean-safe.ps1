@@ -50,7 +50,7 @@ function Safe-Clean {
     Write-Host "$Description : $sizeStr" -ForegroundColor Green
     Write-Host "  路径: $Path" -ForegroundColor DarkGray
     if (-not $WhatIf) {
-        $ok = Remove-Directory -Path $Path -ShowTimer
+        $ok = Remove-Directory -Path $Path -ShowProgress
         if ($ok) { return $r.Size } else { return 0 }
     }
     return $r.Size

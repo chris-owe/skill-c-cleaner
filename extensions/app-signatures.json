@@ -202,7 +202,7 @@
         { "name": "QoderWork", "detect_paths": ["%APPDATA%\\QoderWork"], "cleanable": true },
         { "name": "LobsterAI", "detect_paths": ["%APPDATA%\\LobsterAI"], "cleanable": true },
         { "name": "CodeBuddy", "detect_paths": ["%APPDATA%\\CodeBuddy CN"], "cleanable": true },
-        { "name": "豆包", "detect_paths": ["%APPDATA%\\Doubao"], "cleanable": true },
+        { "name": "豆包", "detect_paths": ["%APPDATA%\\Doubao"], "cleanable": false, "sub_cleanable": "User Data\\Default\\Code Cache, User Data\\Default\\Cache, User Data\\Default\\GPUCache, User Data\\Default\\DawnWebGPUCache, User Data\\Default\\DawnGraphiteCache, User Data\\Default\\Service Worker, User Data\\Default\\blob_storage, User Data\\Default\\File System, debug.log", "note": "Electron应用，含Application程序本体(525MB)不可删。只清User Data下缓存子目录" },
         { "name": "iChat", "detect_paths": ["%APPDATA%\\ichat"], "cleanable": true, "sub_cleanable": "CefLocalStorage, store" },
         { "name": "Cursor", "detect_paths": ["%APPDATA%\\Cursor"], "cleanable": true, "sub_cleanable": "Cache, Code Cache, GPUCache" },
         { "name": "GitHub Copilot", "detect_paths": ["%USERPROFILE%\\.copilot"], "cleanable": true },

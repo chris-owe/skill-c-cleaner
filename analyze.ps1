@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Categories = "all",
     [string]$OutputFormat = "console",
     [string]$Template = "v6-ai-decision"
@@ -47,6 +47,7 @@ $allCats = @(
     @{ Code = "J"; Script = "scan-duplicate-runtimes.ps1" }
     @{ Code = "K"; Script = "scan-ime-data.ps1" }
     @{ Code = "L"; Script = "scan-im-apps.ps1" }
+    @{ Code = "VM"; Script = "scan-virtual-memory.ps1" }
 )
 
 $selectedCats = if ($Categories -eq "all") { $allCats } else {
@@ -118,7 +119,8 @@ $cb = [char]96 + [char]96 + [char]96
 $catNamesCN = @{
     "A"="系统隐藏"; "B"="临时缓存"; "C"="开发缓存"; "D"="浏览器";
     "E"="应用数据"; "F"="大文件"; "G"="特殊占用"; "H"="安全软件";
-    "I"="多版本"; "J"="重复运行时"; "K"="输入法"; "L"="即时通讯"
+    "I"="多版本"; "J"="重复运行时"; "K"="输入法"; "L"="即时通讯";
+    "VM"="虚拟内存"
 }
 
 $knownBloat = @{
@@ -159,6 +161,84 @@ function BuildReport {
         $lines += "| 可安全释放 | $([math]::Round($totalCleanable/1024,2)) GB |"
         $lines += "| 需确认后释放 | $([math]::Round($totalCautious/1024,2)) GB |"
     }
+    
+    if ($Global:VMAssessResult) {
+        $vm = $Global:VMAssessResult
+        $vmSizeGB = [math]::Round($vm.TotalSize / 1GB, 2)
+        $assessmentCN = switch ($vm.Assessment) {
+            "critical" { "🔴 危急 - 建议立即优化" }
+            "warning" { "⚠️ 警告 - 建议评估后优化" }
+            "normal" { "✅ 正常 - 无需调整" }
+            default { "ℹ️ 信息" }
+        }
+        
+        $lines += ""
+        $lines += "# 二、虚拟内存评估"
+        $lines += ""
+        $lines += "## 当前状态"
+        $lines += ""
+        $lines += "| 指标 | 数值 | 状态 |"
+        $lines += "|------|------|------|"
+        $lines += "| C盘可用空间 | $($vm.FreePercent)% | $($vm.FreePercent -lt 30 ? '🔴 不足' : '✅ 充足') |"
+        $lines += "| 页面文件位置 | $(if ($vm.OnC) { 'C盘' } else { '非系统分区' }) | $(if ($vm.OnC -and $vm.Assessment -ne 'normal') { '⚠️ 可优化' } else { '✅ 良好' }) |"
+        $lines += "| 页面文件大小 | $vmSizeGB GB | - |"
+        $lines += "| 评估结果 | $assessmentCN |"
+        $lines += ""
+        
+        if ($vm.Recommendations -and $vm.Recommendations.Count -gt 0) {
+            $lines += "## 优化建议"
+            $lines += ""
+            foreach ($rec in $vm.Recommendations) {
+                $priorityIcon = switch ($rec.Priority) {
+                    "high" { "🔴" }
+                    "medium" { "⚠️" }
+                    "low" { "✅" }
+                    default { "ℹ️" }
+                }
+                $lines += "- **$priorityIcon $($rec.Action)**"
+                $lines += "  - $($rec.Detail)"
+                if ($rec.SpaceRelease -gt 0) {
+                    $lines += "  - 预期效果: 释放 $($rec.SpaceRelease) GB | 性能收益: $($rec.PerformanceGain)"
+                }
+                $lines += ""
+            }
+        }
+        
+        if ($vm.SuitableDrives -and $vm.SuitableDrives.Count -gt 0 -and $vm.Assessment -ne "normal") {
+            $lines += "## 可用迁移目标"
+            $lines += ""
+            foreach ($drive in $vm.SuitableDrives) {
+                $ssdTag = if ($drive.IsSSD) { " ⭐ SSD" } else { "" }
+                $lines += "- **驱动器 ${drive.Drive}:** 可用空间 ${drive.FreeGB} GB $ssdTag"
+                $lines += "  - $($drive.Recommendation)"
+                $lines += ""
+            }
+        }
+        
+        if ($vm.Assessment -ne "normal") {
+            $lines += "## 实施步骤"
+            $lines += ""
+            $lines += "1. 按 **Win+R**，输入 **sysdm.cpl**，回车打开系统属性"
+            $lines += "2. 切换到「**高级**」选项卡，点击「**性能**」区域的「**设置**」"
+            $lines += "3. 切换到「**高级**」选项卡，点击「**虚拟内存**」区域的「**更改**」"
+            $lines += "4. 取消勾选「**自动管理所有驱动器的分页文件大小**」"
+            $lines += "5. 选择C盘，勾选「**自定义大小**」，设置初始: **4096 MB**，最大: **4096 MB**，点击「**设置**」"
+            
+            if ($vm.SuitableDrives -and $vm.SuitableDrives.Count -gt 0) {
+                $primaryDrive = $vm.SuitableDrives | Where-Object { $_.IsSSD } | Select-Object -First 1
+                if (-not $primaryDrive) {
+                    $primaryDrive = $vm.SuitableDrives | Select-Object -First 1
+                }
+                if ($primaryDrive) {
+                    $lines += "6. 选择 **${primaryDrive.Drive}:** 盘，勾选「**自定义大小**」，设置初始: **32768 MB**，最大: **65536 MB**，点击「**设置**」"
+                }
+            }
+            $lines += "7. 连续点击「**确定**」，**重启计算机**使更改生效"
+            $lines += ""
+            $lines += "> ⚠️ **注意:** 保持4GB页面文件在C盘作为备份路径，确保系统兼容性和应急使用。"
+        }
+    }
+    
     $lines | Out-File $mdPath -Encoding UTF8
     Write-Host "  Report generated: $mdPath" -ForegroundColor Green
 }

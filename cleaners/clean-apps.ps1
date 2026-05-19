@@ -98,7 +98,7 @@ function Clean-Directory {
     $sizeStr = if ($sizeMB -ge 1024) { "$([math]::Round($sizeMB/1024,2)) GB" } else { "$sizeMB MB" }
     Write-Host "   $Label : $sizeStr" -NoNewline -ForegroundColor DarkGray
     if (-not $Preview) {
-        $ok = Remove-Directory -Path $Path -ShowTimer
+        $ok = Remove-Directory -Path $Path -ShowProgress
         if ($ok) { return $r.Size }
         Write-Host "   跳过" -ForegroundColor Yellow
         return 0
@@ -188,7 +188,7 @@ foreach ($item in $allApps) {
         }
     } elseif ($app.cleanable -eq $true) {
         if (-not $WhatIf) {
-            $ok = Remove-Directory -Path $result.Path -ShowTimer
+            $ok = Remove-Directory -Path $result.Path -ShowProgress
             if ($ok) {
                 $appFreed = $result.Size
             }
@@ -226,7 +226,7 @@ foreach ($app in @($customApps)) {
     Write-Host "   路径: $($result.Path)" -ForegroundColor DarkGray
 
     if (-not $WhatIf) {
-        $ok = Remove-Directory -Path $result.Path -ShowTimer
+        $ok = Remove-Directory -Path $result.Path -ShowProgress
         if ($ok) {
             $totalFreed += $result.Size
             $cleanedCount++
