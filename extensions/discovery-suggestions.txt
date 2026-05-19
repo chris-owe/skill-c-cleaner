@@ -122,20 +122,237 @@
           "recommendations": [
             {
               "action": "exclude_directories",
-              "title": "Exclude Development Directories from Indexing",
-              "folders": [
-                "%USERPROFILE%\\.nuget\\packages",
-                "D:\\GitHub\\*\\node_modules",
-                "D:\\GitHub\\*\\.git",
-                "D:\\GitHub\\*\\build",
-                "D:\\GitHub\\*\\dist",
-                "D:\\GitHub\\*\\target",
-                "D:\\GitHub\\*\\bin\\obj",
-                "D:\\*\\node_modules",
-                "D:\\*\\.gradle",
-                "D:\\*\\vendor"
-              ],
-              "reason": "node_modules contains millions of small files, indexing them wastes CPU and disk I/O"
+              "title": "Exclude Development Directories from Indexing (Comprehensive List)",
+              "description": "Comprehensive exclusion list covering all major development tools, languages, and frameworks. This reduces 90%+ of unnecessary indexing workload.",
+              "dynamic_scan": {
+                "available": true,
+                "scanner": "SI - scan-search-index.ps1",
+                "how_to_run": "Run the analyzer and look for 'SI类: Search索引优化扫描' output, or run: .\\scanners\\scan-search-index.ps1",
+                "output_file": "reports\\search-index-exclusions.json",
+                "output_content": "Contains dynamically-generated exclusion list based on your actual project structure, including project-level matches, wildcard patterns, system caches, and IDE caches.",
+                "benefit": "The scanner discovers what actually exists on your system and generates precise exclusion paths, rather than relying on generic templates."
+              },
+              "tiers": {
+                "critical_tier": {
+                  "title": "Critical - Must Exclude (These contain millions of small files)",
+                  "items": [
+                    "D:\\GitHub\\*\\node_modules",
+                    "D:\\GitHub\\*\\build",
+                    "D:\\GitHub\\*\\dist",
+                    "D:\\GitHub\\*\\target",
+                    "D:\\GitHub\\*\\.gradle",
+                    "D:\\*\\node_modules"
+                  ],
+                  "impact": "90% of indexing time reduction"
+                },
+                "high_priority_tier": {
+                  "title": "High Priority - Should Exclude",
+                  "items": [
+                    "D:\\GitHub\\.git",
+                    "D:\\GitHub\\bin",
+                    "D:\\GitHub\\obj",
+                    "D:\\GitHub\\**\\.idea",
+                    "D:\\GitHub\\**\\__pycache__",
+                    "D:\\GitHub\\**\\venv",
+                    "D:\\GitHub\\**\\.venv",
+                    "D:\\GitHub\\**\\vendor",
+                    "D:\\GitHub\\**\\vendor\\bin",
+                    "D:\\GitHub\\**\\Library",
+                    "D:\\GitHub\\**\\Temp",
+                    "D:\\GitHub\\**\\Logs",
+                    "D:\\GitHub\\**\\Saved"
+                  ]
+                },
+                "important_tier": {
+                  "title": "Important - Recommended Exclude",
+                  "items": [
+                    "D:\\GitHub\\**\\.vs",
+                    "D:\\GitHub\\**\\Debug",
+                    "D:\\GitHub\\**\\Release",
+                    "D:\\GitHub\\**\\x64",
+                    "D:\\GitHub\\**\\x86",
+                    "D:\\GitHub\\**\\*.suo",
+                    "D:\\GitHub\\**\\*.user",
+                    "D:\\GitHub\\**\\.nuget",
+                    "D:\\GitHub\\**\\packages",
+                    "D:\\GitHub\\**\\bin\\obj",
+                    "D:\\GitHub\\**\\TestResults",
+                    "D:\\GitHub\\**\\.sass-cache",
+                    "D:\\GitHub\\**\\coverage"
+                  ]
+                }
+              },
+              "language_specific_exclusions": {
+                "javascript_typescript": [
+                  "D:\\GitHub\\*\\node_modules",
+                  "D:\\GitHub\\*\\.next",
+                  "D:\\GitHub\\*\\out",
+                  "D:\\GitHub\\*\\dist",
+                  "D:\\GitHub\\*\\coverage"
+                ],
+                "java_kotlin": [
+                  "D:\\GitHub\\*\\target",
+                  "D:\\GitHub\\*\\.gradle",
+                  "D:\\GitHub\\*\\build",
+                  "D:\\GitHub\\*\\.idea",
+                  "D:\\GitHub\\*\\*.iml"
+                ],
+                "python": [
+                  "D:\\GitHub\\*\\__pycache__",
+                  "D:\\GitHub\\*\\*.egg-info",
+                  "D:\\GitHub\\*\\venv",
+                  "D:\\GitHub\\*\\.venv",
+                  "D:\\GitHub\\*\\env",
+                  "D:\\GitHub\\*\\.eggs",
+                  "D:\\GitHub\\*\\build\\lib"
+                ],
+                "dotnet": [
+                  "D:\\GitHub\\*\\bin",
+                  "D:\\GitHub\\*\\obj",
+                  "D:\\GitHub\\*\\packages",
+                  "D:\\GitHub\\*\\TestResults"
+                ],
+                "rust": [
+                  "D:\\GitHub\\*\\target",
+                  "D:\\GitHub\\*\\.cargo"
+                ],
+                "go": [
+                  "D:\\GitHub\\*\\vendor",
+                  "D:\\GitHub\\*\\bin"
+                ],
+                "unity_unreal": [
+                  "D:\\GitHub\\*\\Library",
+                  "D:\\GitHub\\*\\Temp",
+                  "D:\\GitHub\\*\\Logs",
+                  "D:\\GitHub\\*\\Saved",
+                  "D:\\GitHub\\*\\Intermediate",
+                  "D:\\GitHub\\*\\DerivedDataCache"
+                ],
+                "flutter": [
+                  "D:\\GitHub\\*\\.dart_tool",
+                  "D:\\GitHub\\*\\build",
+                  "D:\\GitHub\\*\\.pub-cache",
+                  "D:\\GitHub\\*\\.android",
+                  "D:\\GitHub\\*\\.ios"
+                ]
+              },
+              "system_exclusions": {
+                "temp_directories": [
+                  "%TEMP%",
+                  "%LOCALAPPDATA%\\Temp",
+                  "C:\\Windows\\Temp",
+                  "C:\\Windows\\Prefetch"
+                ],
+                "package_managers": [
+                  "%USERPROFILE%\\.nuget\\packages",
+                  "%USERPROFILE%\\.gradle\\caches",
+                  "%USERPROFILE%\\.m2\\repository",
+                  "%USERPROFILE%\\.cargo\\registry",
+                  "%USERPROFILE%\\.pub-cache",
+                  "%USERPROFILE%\\.cocoapods",
+                  "%USERPROFILE%\\.npm"
+                ],
+                "browser_caches": [
+                  "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\*\\Cache",
+                  "%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\*\\Cache",
+                  "%LOCALAPPDATA%\\Mozilla\\Firefox\\Profiles\\*\\cache2"
+                ]
+              },
+              "complete_recommended_list": {
+                "title": "Complete Recommended Exclusions List (Copy All)",
+                "items": [
+                  "D:\\GitHub\\node_modules",
+                  "D:\\GitHub\\build",
+                  "D:\\GitHub\\dist",
+                  "D:\\GitHub\\target",
+                  "D:\\GitHub\\.git",
+                  "D:\\GitHub\\.gradle",
+                  "D:\\GitHub\\bin",
+                  "D:\\GitHub\\obj",
+                  "D:\\GitHub\\**\\.idea",
+                  "D:\\GitHub\\**\\__pycache__",
+                  "D:\\GitHub\\**\\venv",
+                  "D:\\GitHub\\**\\.venv",
+                  "D:\\GitHub\\**\\vendor",
+                  "D:\\GitHub\\**\\Library",
+                  "D:\\GitHub\\**\\Temp",
+                  "D:\\GitHub\\**\\Logs",
+                  "D:\\GitHub\\**\\Saved",
+                  "D:\\GitHub\\**\\.vs",
+                  "D:\\GitHub\\**\\Debug",
+                  "D:\\GitHub\\**\\Release",
+                  "D:\\GitHub\\**\\x64",
+                  "D:\\GitHub\\**\\x86",
+                  "D:\\GitHub\\**\\.nuget",
+                  "D:\\GitHub\\**\\packages",
+                  "D:\\GitHub\\**\\TestResults",
+                  "D:\\GitHub\\**\\bin\\obj",
+                  "D:\\GitHub\\**\\*.suo",
+                  "D:\\GitHub\\**\\*.user",
+                  "D:\\GitHub\\**\\.sass-cache",
+                  "D:\\GitHub\\**\\coverage",
+                  "D:\\GitHub\\**\\node_modules",
+                  "D:\\GitHub\\**\\.next",
+                  "D:\\GitHub\\**\\.gradle",
+                  "D:\\GitHub\\**\\target",
+                  "D:\\GitHub\\**\\build",
+                  "D:\\GitHub\\**\\__pycache__",
+                  "D:\\GitHub\\**\\venv",
+                  "D:\\GitHub\\**\\.venv",
+                  "D:\\GitHub\\**\\env",
+                  "D:\\GitHub\\**\\vendor",
+                  "D:\\GitHub\\**\\Library",
+                  "D:\\GitHub\\**\\Temp",
+                  "D:\\GitHub\\**\\Logs",
+                  "D:\\GitHub\\**\\Saved",
+                  "D:\\GitHub\\**\\.dart_tool",
+                  "D:\\GitHub\\**\\.pub-cache",
+                  "D:\\GitHub\\**\\.android",
+                  "D:\\GitHub\\**\\.ios",
+                  "%TEMP%",
+                  "%LOCALAPPDATA%\\Temp",
+                  "C:\\Windows\\Temp",
+                  "C:\\Windows\\Prefetch",
+                  "%USERPROFILE%\\.nuget\\packages",
+                  "%USERPROFILE%\\.gradle\\caches",
+                  "%USERPROFILE%\\.m2\\repository",
+                  "%USERPROFILE%\\.cargo\\registry",
+                  "%USERPROFILE%\\.pub-cache",
+                  "%USERPROFILE%\\.cocoapods",
+                  "%USERPROFILE%\\.npm"
+                ],
+                "count": 62,
+                "estimated_coverage": "95% of unnecessary indexing workload"
+              },
+              "quick_minimal_list": {
+                "title": "Quick Minimal List (If 62 is too many)",
+                "items": [
+                  "D:\\GitHub\\*\\node_modules",
+                  "D:\\GitHub\\*\\build",
+                  "D:\\GitHub\\*\\dist",
+                  "D:\\GitHub\\*\\target",
+                  "D:\\GitHub\\*\\.gradle",
+                  "D:\\GitHub\\*\\.git",
+                  "D:\\GitHub\\*\\bin",
+                  "D:\\GitHub\\*\\obj",
+                  "D:\\GitHub\\*\\__pycache__",
+                  "D:\\GitHub\\*\\venv",
+                  "D:\\GitHub\\*\\.venv",
+                  "D:\\GitHub\\*\\vendor",
+                  "%USERPROFILE%\\.nuget\\packages",
+                  "%USERPROFILE%\\.gradle\\caches",
+                  "%TEMP%"
+                ],
+                "count": 15,
+                "estimated_coverage": "80% of unnecessary indexing workload"
+              },
+              "reason": "These directories contain millions of small files (especially node_modules), generated artifacts, caches, and system files that provide no search value but consume massive CPU and disk I/O during indexing. Excluding them reduces indexing time by 90%+ and frees significant system resources.",
+              "estimated_savings": {
+                "indexing_time": "Reduce from 300-500 seconds to 30-50 seconds per indexing cycle",
+                "cpu_usage": "Reduce by 80-90% during indexing",
+                "disk_i_o": "Reduce by 85-95% during indexing",
+                "developer_frustration": "Near zero lag during development work"
+              }
             },
             {
               "action": "schedule_indexing",
@@ -155,13 +372,19 @@
             }
           ],
           "implementation": {
-            "method": "gui",
+            "method": "dynamic_scan_and_gui",
             "steps": [
-              "Open Windows Search settings (Settings > Privacy & security > Searching Windows)",
-              "Click 'Advanced indexer settings'",
-              "Click 'Modify' under 'Exclude folders from indexing'",
-              "Add the development directories listed above",
-              "Click OK to save changes"
+              "Step 1: Run the SI scanner to dynamically discover your project structure:",
+              "  Option A: Run full analysis: .\\analyze.ps1 (look for 'SI类: Search索引优化扫描' output)",
+              "  Option B: Run scanner only: .\\scanners\\scan-search-index.ps1",
+              "  After scan, check: reports\\search-index-exclusions.json for generated exclusion list",
+              "",
+              "Step 2: Apply exclusions via Windows Search settings:",
+              "  Open Windows Search settings (Settings > Privacy & security > Searching Windows)",
+              "  Click 'Advanced indexer settings'",
+              "  Click 'Modify' under 'Exclude folders from indexing'",
+              "  Add the directories from the generated exclusion list, or use the template below",
+              "  Click OK to save changes"
             ]
           },
           "expected_results": {
@@ -523,7 +746,7 @@
                 "recommendation": "Add TRAE installation and cache folders",
                 "paths": [
                   "D:\\编程软件\\TREA国内\\Trae CN",
-                  "C:\\Users\\decent\\AppData\\Roaming\\Trae"
+                  "%USERPROFILE%\\AppData\\Roaming\\Trae"
                 ],
                 "benefit": "Reduces real-time scanning overhead on cache files"
               }

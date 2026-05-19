@@ -48,6 +48,7 @@ $allCats = @(
     @{ Code = "K"; Script = "scan-ime-data.ps1" }
     @{ Code = "L"; Script = "scan-im-apps.ps1" }
     @{ Code = "VM"; Script = "scan-virtual-memory.ps1" }
+    @{ Code = "SI"; Script = "scan-search-index.ps1" }
 )
 
 $selectedCats = if ($Categories -eq "all") { $allCats } else {
@@ -120,7 +121,7 @@ $catNamesCN = @{
     "A"="系统隐藏"; "B"="临时缓存"; "C"="开发缓存"; "D"="浏览器";
     "E"="应用数据"; "F"="大文件"; "G"="特殊占用"; "H"="安全软件";
     "I"="多版本"; "J"="重复运行时"; "K"="输入法"; "L"="即时通讯";
-    "VM"="虚拟内存"
+    "VM"="虚拟内存"; "SI"="Search索引"
 }
 
 $knownBloat = @{
