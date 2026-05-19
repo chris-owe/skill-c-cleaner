@@ -477,5 +477,5 @@ v1.0 基础扫描 → v2.0 结构化报告 → v3.0 四维分析 → v4.0 文件
 </p>
 
 <p align="center">
-  Made with ❤️ by AI and Open Source Community
+  Made with ❤️ by <strong>niuhai</strong>
 </p>
