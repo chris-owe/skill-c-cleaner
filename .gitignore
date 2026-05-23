@@ -91,7 +91,14 @@ ModuleAnalysisCache.psm1
 # PSScriptAnalyzer 结果
 *-ScriptAnalyzerResults.csv
 
-# ---------- 📂 其他 ----------
+# ---------- 🚧 实验性/临时文件 ----------
+# 实验性脚本（备用版本）
+analyze_new.ps1
+
+# 运行时生成的报告目录
+reports/
+
+# ---------- 📝 临时文件 ----------
 # 测试输出
 test-results/
 coverage/
